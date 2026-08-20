@@ -1,6 +1,7 @@
 package com.ftf.transaction_service.client;
 
 import com.ftf.transaction_service.client.dto.AccountResponse;
+import com.ftf.transaction_service.client.dto.InternalTransferRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -22,6 +23,14 @@ public class AccountServiceClient {
                 url,
                 AccountResponse.class,
                 accountNumber
+        );
+    }
+
+    public void transfer(InternalTransferRequest request) {
+        restTemplate.postForEntity(
+                "http://localhost:8081/api/v1/accounts/internal/transfers",
+                request,
+                Void.class
         );
     }
 }

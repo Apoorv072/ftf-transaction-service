@@ -2,6 +2,7 @@ package com.ftf.transaction_service.service;
 
 import com.ftf.transaction_service.client.AccountServiceClient;
 import com.ftf.transaction_service.client.dto.AccountResponse;
+import com.ftf.transaction_service.client.dto.InternalTransferRequest;
 import com.ftf.transaction_service.dto.TransactionRequest;
 import com.ftf.transaction_service.dto.TransactionResponse;
 import com.ftf.transaction_service.entity.Transaction;
@@ -97,6 +98,44 @@ public class TransactionServiceImpl implements TransactionService {
 
         Transaction savedTransaction =
                 transactionRepository.save(transaction);
+       //   Creating internal transfer request and calling account service client
+        try {
+
+            InternalTransferRequest transferRequest =
+                    new InternalTransferRequest();
+
+            transferRequest.setSourceAccountId(
+                    sourceAccount.getId()
+            );
+
+            transferRequest.setDestinationAccountId(
+                    destinationAccount.getId()
+            );
+
+            transferRequest.setAmount(
+                    request.getAmount()
+            );
+
+            transferRequest.setCurrency(
+                    request.getCurrency()
+            );
+
+            transferRequest.setTransactionReference(
+                    savedTransaction.getTransactionReference()
+            );
+
+            accountServiceClient.transfer(transferRequest);
+
+            savedTransaction.setStatus(
+                    TransactionStatus.COMPLETED
+            );
+
+        } catch (Exception e) {
+
+            savedTransaction.setStatus(
+                    TransactionStatus.FAILED
+            );
+        }
 
         return MapperUtility.mapToTransactionResponse(
                 savedTransaction
