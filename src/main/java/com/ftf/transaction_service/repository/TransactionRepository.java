@@ -14,4 +14,8 @@ public interface TransactionRepository
     boolean existsByTransactionReference(
             String transactionReference
     );
+
+    Optional<Transaction> findByIdempotencyKey(
+            String idempotencyKey
+    );
 }

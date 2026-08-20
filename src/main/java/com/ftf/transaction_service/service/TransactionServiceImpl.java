@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -28,7 +29,18 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     @Transactional
     public TransactionResponse createTransaction(
-            TransactionRequest request) {
+            TransactionRequest request, String idempotencyKey) {
+
+        // Check whether the transaction is already present
+
+        Optional<Transaction> existingTransaction =
+                transactionRepository.findByIdempotencyKey(idempotencyKey);
+
+        if (existingTransaction.isPresent()) {
+            return MapperUtility.mapToTransactionResponse(
+                    existingTransaction.get()
+            );
+        }
 
         AccountResponse sourceAccount =
                 accountServiceClient.getAccountByNumber(
@@ -47,6 +59,8 @@ public class TransactionServiceImpl implements TransactionService {
         );
 
         Transaction transaction = new Transaction();
+
+        transaction.setIdempotencyKey(idempotencyKey);
 
         transaction.setTransactionReference(
                 generateTransactionReference()

@@ -16,6 +16,14 @@ public class Transaction {
     private Long id;
 
     @Column(
+            name = "idempotency_key",
+            nullable = false,
+            unique = true,
+            length = 100
+    )
+    private String idempotencyKey;
+
+    @Column(
             name = "transaction_reference",
             nullable = false,
             unique = true,
