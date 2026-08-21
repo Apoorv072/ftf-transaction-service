@@ -13,5 +13,4 @@ public class AccountResponse {
     private BigDecimal balance;
     private String status;
 
-    // getters and setters
 }

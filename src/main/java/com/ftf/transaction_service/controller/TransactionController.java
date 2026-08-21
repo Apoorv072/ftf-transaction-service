@@ -21,19 +21,6 @@ public class TransactionController {
         this.accountServiceClient=accountServiceClient;
     }
 
-//    @PostMapping
-//    public ResponseEntity<TransactionResponse> createTransaction(
-//            @Valid @RequestBody TransactionRequest request) {
-//
-//        TransactionResponse response =
-//                transactionService.createTransaction(request);
-//
-//        return ResponseEntity
-//                .status(HttpStatus.CREATED)
-//                .body(response);
-//    }
-
-
     @PostMapping
     public ResponseEntity<TransactionResponse> createTransaction(@RequestHeader("Idempotency-Key") String idempotencyKey, @Valid @RequestBody TransactionRequest request) {
         System.out.println("flag 1");

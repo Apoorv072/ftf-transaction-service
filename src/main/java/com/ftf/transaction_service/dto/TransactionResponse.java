@@ -28,5 +28,4 @@ public class TransactionResponse {
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
 
-    // getters and setters
 }

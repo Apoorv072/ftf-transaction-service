@@ -59,22 +59,33 @@ public class TransactionServiceImpl implements TransactionService {
         transaction.setCurrency(request.getCurrency().toUpperCase());
         transaction.setTransactionType(request.getTransactionType());
         transaction.setStatus(TransactionStatus.PENDING);                  // transaction pending
+        LimitReservationResponse limitResponse = new LimitReservationResponse();
+      try {
+          LimitReservationRequest limitRequest = new LimitReservationRequest();
 
-        LimitReservationRequest limitRequest = new LimitReservationRequest();
+          limitRequest.setAccountId(sourceAccount.getId()); //source account
+          limitRequest.setAmount(request.getAmount());
+          limitRequest.setCurrency(request.getCurrency());
+          limitRequest.setTransactionReference(transaction.getTransactionReference());
 
-        limitRequest.setAccountId(sourceAccount.getId()); //source account
-        limitRequest.setAmount(request.getAmount());
-        limitRequest.setCurrency(request.getCurrency());
-        limitRequest.setTransactionReference(transaction.getTransactionReference());
-
-        // Check whether the source account has the valid limit
-        LimitReservationResponse limitResponse = limitServiceClient.reserveLimit(limitRequest);
+          // Check whether the source account has the valid limit
+          limitResponse = limitServiceClient.reserveLimit(limitRequest);
 
         if (!limitResponse.isAllowed()) {
             transaction.setStatus(TransactionStatus.FAILED);
             transactionRepository.save(transaction);
             return MapperUtility.mapToTransactionResponse(transaction);
-        }
+          }
+      }catch (Exception e) {
+          transaction.setStatus(TransactionStatus.FAILED);
+          transaction.setDescription(request.getDescription());
+          LocalDateTime now = LocalDateTime.now();
+          transaction.setCreatedAt(now);
+          transaction.setUpdatedAt(now);
+
+          Transaction savedTransaction = transactionRepository.save(transaction);
+          return MapperUtility.mapToTransactionResponse(savedTransaction);
+      }
 
         transaction.setDescription(request.getDescription());
         LocalDateTime now = LocalDateTime.now();
@@ -100,6 +111,7 @@ public class TransactionServiceImpl implements TransactionService {
 
         } catch (Exception e) {
             savedTransaction.setStatus(TransactionStatus.FAILED);
+            limitServiceClient.releaseLimit(limitResponse.getReservationId()); // Release the limit in case of money movement failure
         }
 
         return MapperUtility.mapToTransactionResponse(savedTransaction);

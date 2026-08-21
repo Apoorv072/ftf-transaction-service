@@ -15,20 +15,10 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(
-            name = "idempotency_key",
-            nullable = false,
-            unique = true,
-            length = 100
-    )
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 100)
     private String idempotencyKey;
 
-    @Column(
-            name = "transaction_reference",
-            nullable = false,
-            unique = true,
-            length = 50
-    )
+    @Column(name = "transaction_reference", nullable = false, unique = true, length = 50)
     private String transactionReference;
 
     @Column(name = "source_account_id")
@@ -37,29 +27,18 @@ public class Transaction {
     @Column(name = "destination_account_id")
     private Long destinationAccountId;
 
-    @Column(
-            nullable = false,
-            precision = 19,
-            scale = 4
-    )
+    @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
 
     @Column(nullable = false, length = 3)
     private String currency;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            name = "transaction_type",
-            nullable = false,
-            length = 30
-    )
+    @Column(name = "transaction_type", nullable = false, length = 30)
     private TransactionType transactionType;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            nullable = false,
-            length = 30
-    )
+    @Column(nullable = false, length = 30)
     private TransactionStatus status;
 
     @Column(length = 500)
@@ -74,5 +53,4 @@ public class Transaction {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
-    // getters and setters
 }
