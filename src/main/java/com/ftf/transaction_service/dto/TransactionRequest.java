@@ -19,18 +19,11 @@ public class TransactionRequest {
     private String destinationAccountNumber;
 
     @NotNull(message = "Amount is required")
-    @DecimalMin(
-            value = "0.01",
-            message = "Amount must be greater than zero"
-    )
+    @DecimalMin(value = "0.01", message = "Amount must be greater than zero")
     private BigDecimal amount;
 
     @NotBlank(message = "Currency is required")
-    @Size(
-            min = 3,
-            max = 3,
-            message = "Currency must be 3 characters"
-    )
+    @Size(min = 3,max = 3, message = "Currency must be 3 characters")
     private String currency;
 
     @NotNull(message = "Transaction type is required")
@@ -39,5 +32,4 @@ public class TransactionRequest {
     @Size(max = 500, message = "Description cannot exceed 500 characters")
     private String description;
 
-    // getters and setters
 }

@@ -16,14 +16,8 @@ public class AccountServiceClient {
 
     public AccountResponse getAccountByNumber(String accountNumber) {
 
-               String url =
-                "http://localhost:8081/api/v1/accounts/byNumber/"+accountNumber;
-
-        return restTemplate.getForObject(
-                url,
-                AccountResponse.class,
-                accountNumber
-        );
+        String url = "http://localhost:8081/api/v1/accounts/byNumber/"+accountNumber;
+        return restTemplate.getForObject(url, AccountResponse.class, accountNumber);
     }
 
     public void transfer(InternalTransferRequest request) {

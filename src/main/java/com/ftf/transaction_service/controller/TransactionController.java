@@ -35,26 +35,18 @@ public class TransactionController {
 
 
     @PostMapping
-    public ResponseEntity<TransactionResponse> createTransaction(
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @Valid @RequestBody TransactionRequest request) {
-
-        TransactionResponse response =
-                transactionService.createTransaction(
-                        request,
-                        idempotencyKey
-                );
-
+    public ResponseEntity<TransactionResponse> createTransaction(@RequestHeader("Idempotency-Key") String idempotencyKey, @Valid @RequestBody TransactionRequest request) {
+        System.out.println("flag 1");
+        TransactionResponse response = transactionService.createTransaction(request, idempotencyKey);
+        System.out.println("flag 2");
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
     }
     @GetMapping("/test-account/{accountNumber}")
-    public ResponseEntity<AccountResponse> testAccount(
-            @PathVariable String accountNumber) {
+    public ResponseEntity<AccountResponse> testAccount(@PathVariable String accountNumber) {
 
-        return ResponseEntity.ok(
-                accountServiceClient.getAccountByNumber(accountNumber)
+        return ResponseEntity.ok(accountServiceClient.getAccountByNumber(accountNumber)
         );
     }
 }

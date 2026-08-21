@@ -1,8 +1,11 @@
 package com.ftf.transaction_service.service;
 
 import com.ftf.transaction_service.client.AccountServiceClient;
+import com.ftf.transaction_service.client.LimitServiceClient;
 import com.ftf.transaction_service.client.dto.AccountResponse;
 import com.ftf.transaction_service.client.dto.InternalTransferRequest;
+import com.ftf.transaction_service.client.dto.LimitReservationRequest;
+import com.ftf.transaction_service.client.dto.LimitReservationResponse;
 import com.ftf.transaction_service.dto.TransactionRequest;
 import com.ftf.transaction_service.dto.TransactionResponse;
 import com.ftf.transaction_service.entity.Transaction;
@@ -21,175 +24,111 @@ public class TransactionServiceImpl implements TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final AccountServiceClient accountServiceClient;
+    private final LimitServiceClient limitServiceClient;
 
-    public TransactionServiceImpl(TransactionRepository transactionRepository, AccountServiceClient accountServiceClient) {
+    public TransactionServiceImpl(TransactionRepository transactionRepository, AccountServiceClient accountServiceClient,LimitServiceClient limitServiceClient) {
         this.transactionRepository = transactionRepository;
         this.accountServiceClient = accountServiceClient;
+        this.limitServiceClient = limitServiceClient;
     }
 
     @Override
     @Transactional
-    public TransactionResponse createTransaction(
-            TransactionRequest request, String idempotencyKey) {
+    public TransactionResponse createTransaction(TransactionRequest request, String idempotencyKey) {
 
         // Check whether the transaction is already present
 
-        Optional<Transaction> existingTransaction =
-                transactionRepository.findByIdempotencyKey(idempotencyKey);
+        Optional<Transaction> existingTransaction = transactionRepository.findByIdempotencyKey(idempotencyKey);
 
         if (existingTransaction.isPresent()) {
-            return MapperUtility.mapToTransactionResponse(
-                    existingTransaction.get()
-            );
+            return MapperUtility.mapToTransactionResponse(existingTransaction.get());
         }
 
-        AccountResponse sourceAccount =
-                accountServiceClient.getAccountByNumber(
-                        request.getSourceAccountNumber()
-                );
+        AccountResponse sourceAccount = accountServiceClient.getAccountByNumber(request.getSourceAccountNumber());
+        AccountResponse destinationAccount = accountServiceClient.getAccountByNumber(request.getDestinationAccountNumber());
 
-        AccountResponse destinationAccount =
-                accountServiceClient.getAccountByNumber(
-                        request.getDestinationAccountNumber()
-                );
-
-        validateAccounts(
-                sourceAccount,
-                destinationAccount,
-                request
-        );
+        validateAccounts(sourceAccount, destinationAccount, request);
 
         Transaction transaction = new Transaction();
 
         transaction.setIdempotencyKey(idempotencyKey);
-
-        transaction.setTransactionReference(
-                generateTransactionReference()
-        );
-
-        transaction.setSourceAccountId(
-                sourceAccount.getId()
-        );
-
-        transaction.setDestinationAccountId(
-                destinationAccount.getId()
-        );
-
+        transaction.setTransactionReference(generateTransactionReference());
+        transaction.setSourceAccountId(sourceAccount.getId());
+        transaction.setDestinationAccountId(destinationAccount.getId());
         transaction.setAmount(request.getAmount());
+        transaction.setCurrency(request.getCurrency().toUpperCase());
+        transaction.setTransactionType(request.getTransactionType());
+        transaction.setStatus(TransactionStatus.PENDING);                  // transaction pending
 
-        transaction.setCurrency(
-                request.getCurrency().toUpperCase()
-        );
+        LimitReservationRequest limitRequest = new LimitReservationRequest();
 
-        transaction.setTransactionType(
-                request.getTransactionType()
-        );
+        limitRequest.setAccountId(sourceAccount.getId()); //source account
+        limitRequest.setAmount(request.getAmount());
+        limitRequest.setCurrency(request.getCurrency());
+        limitRequest.setTransactionReference(transaction.getTransactionReference());
 
-        transaction.setStatus(TransactionStatus.PENDING);
+        // Check whether the source account has the valid limit
+        LimitReservationResponse limitResponse = limitServiceClient.reserveLimit(limitRequest);
 
-        transaction.setDescription(
-                request.getDescription()
-        );
+        if (!limitResponse.isAllowed()) {
+            transaction.setStatus(TransactionStatus.FAILED);
+            transactionRepository.save(transaction);
+            return MapperUtility.mapToTransactionResponse(transaction);
+        }
 
+        transaction.setDescription(request.getDescription());
         LocalDateTime now = LocalDateTime.now();
-
         transaction.setCreatedAt(now);
         transaction.setUpdatedAt(now);
 
-        Transaction savedTransaction =
-                transactionRepository.save(transaction);
+        Transaction savedTransaction = transactionRepository.save(transaction);
+        savedTransaction.setStatus(TransactionStatus.PROCESSING);           // processing Transaction
+        savedTransaction.setUpdatedAt(LocalDateTime.now());
+        savedTransaction = transactionRepository.save(savedTransaction);
+
        //   Creating internal transfer request and calling account service client
         try {
-
-            InternalTransferRequest transferRequest =
-                    new InternalTransferRequest();
-
-            transferRequest.setSourceAccountId(
-                    sourceAccount.getId()
-            );
-
-            transferRequest.setDestinationAccountId(
-                    destinationAccount.getId()
-            );
-
-            transferRequest.setAmount(
-                    request.getAmount()
-            );
-
-            transferRequest.setCurrency(
-                    request.getCurrency()
-            );
-
-            transferRequest.setTransactionReference(
-                    savedTransaction.getTransactionReference()
-            );
+            InternalTransferRequest transferRequest = new InternalTransferRequest();
+            transferRequest.setSourceAccountId(sourceAccount.getId());
+            transferRequest.setDestinationAccountId(destinationAccount.getId());
+            transferRequest.setAmount(request.getAmount());
+            transferRequest.setCurrency(request.getCurrency());
+            transferRequest.setTransactionReference(savedTransaction.getTransactionReference());
 
             accountServiceClient.transfer(transferRequest);
-
-            savedTransaction.setStatus(
-                    TransactionStatus.COMPLETED
-            );
+            savedTransaction.setStatus(TransactionStatus.COMPLETED);
 
         } catch (Exception e) {
-
-            savedTransaction.setStatus(
-                    TransactionStatus.FAILED
-            );
+            savedTransaction.setStatus(TransactionStatus.FAILED);
         }
 
-        return MapperUtility.mapToTransactionResponse(
-                savedTransaction
-        );
+        return MapperUtility.mapToTransactionResponse(savedTransaction);
     }
 
     private String generateTransactionReference() {
-
-        return "TXN-" +
-                UUID.randomUUID()
-                        .toString()
-                        .replace("-", "")
-                        .substring(0, 20)
-                        .toUpperCase();
+        return "TXN-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20).toUpperCase();
     }
-    private void validateAccounts(
-            AccountResponse sourceAccount,
-            AccountResponse destinationAccount,
-            TransactionRequest request) {
+
+    private void validateAccounts(AccountResponse sourceAccount, AccountResponse destinationAccount, TransactionRequest request) {
 
         if (!"ACTIVE".equals(sourceAccount.getStatus())) {
-            throw new IllegalStateException(
-                    "Source account is not active"
-            );
+            throw new IllegalStateException("Source account is not active");
         }
 
         if (!"ACTIVE".equals(destinationAccount.getStatus())) {
-            throw new IllegalStateException(
-                    "Destination account is not active"
-            );
+            throw new IllegalStateException("Destination account is not active");
         }
 
-        if (sourceAccount.getId()
-                .equals(destinationAccount.getId())) {
-
-            throw new IllegalArgumentException(
-                    "Source and destination accounts cannot be the same"
-            );
+        if (sourceAccount.getId().equals(destinationAccount.getId())) {
+            throw new IllegalArgumentException("Source and destination accounts cannot be the same");
         }
 
-        if (!sourceAccount.getCurrency()
-                .equalsIgnoreCase(request.getCurrency())) {
-
-            throw new IllegalArgumentException(
-                    "Source account currency does not match transaction currency"
-            );
+        if (!sourceAccount.getCurrency().equalsIgnoreCase(request.getCurrency())) {
+            throw new IllegalArgumentException("Source account currency does not match transaction currency");
         }
 
-        if (!destinationAccount.getCurrency()
-                .equalsIgnoreCase(request.getCurrency())) {
-
-            throw new IllegalArgumentException(
-                    "Destination account currency does not match transaction currency"
-            );
+        if (!destinationAccount.getCurrency().equalsIgnoreCase(request.getCurrency())) {
+            throw new IllegalArgumentException("Destination account currency does not match transaction currency");
         }
     }
 }
